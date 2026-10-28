@@ -105,6 +105,7 @@
     let messageIndex = 0;
     let activeBurstMessage = null;
     let showPhoto = false;
+    let finaleActive = false;
     let animationStopped = false;
     let finalPortraitPosition = null;
     const portrait = new Image();
@@ -302,7 +303,8 @@
             y: rocket.y,
             hue: burstHue,
             age: 0,
-            life: 5,
+            life: 1.4,
+            phase: "reveal",
             photo: true
           };
         }
@@ -397,14 +399,16 @@
         context.fill();
       }
 
-      if (!showPhoto && timestamp - lastLaunchTime > nextLaunchDelay) {
+      if ((!showPhoto || finaleActive) && timestamp - lastLaunchTime > nextLaunchDelay) {
         launchRocket();
         lastLaunchTime = timestamp;
-        nextLaunchDelay = 420 + Math.random() * 700;
-        if (!showPhoto && Math.random() > 0.58) {
+        nextLaunchDelay = finaleActive
+          ? 85 + Math.random() * 100
+          : 420 + Math.random() * 700;
+        if ((!showPhoto || finaleActive) && Math.random() > (finaleActive ? 0.38 : 0.58)) {
           window.setTimeout(() => {
-            if (!document.hidden && !showPhoto) launchRocket();
-          }, 160 + Math.random() * 300);
+            if (!document.hidden && (!showPhoto || finaleActive)) launchRocket();
+          }, finaleActive ? 35 + Math.random() * 90 : 160 + Math.random() * 300);
         }
       }
 
@@ -485,17 +489,33 @@
         const progress = burst.age / burst.life;
         if (progress >= 1) {
           if (burst.photo) {
-            rockets = [];
-            particles = [];
-            context.clearRect(0, 0, window.innerWidth, window.innerHeight);
-            drawFinalPortrait();
-            animationStopped = true;
-            return;
+            if (burst.phase === "reveal") {
+              burst.phase = "zoom-out";
+              burst.age = 0;
+              burst.life = 3;
+            } else if (burst.phase === "zoom-out") {
+              burst.phase = "finale";
+              burst.age = 0;
+              burst.life = 2;
+              finaleActive = true;
+              rockets = [];
+              particles = [];
+              lastLaunchTime = timestamp;
+              nextLaunchDelay = 0;
+            } else {
+              rockets = [];
+              particles = [];
+              context.clearRect(0, 0, window.innerWidth, window.innerHeight);
+              drawFinalPortrait();
+              animationStopped = true;
+              return;
+            }
+          } else {
+            activeBurstMessage = null;
           }
-          activeBurstMessage = null;
         } else {
           const fadeIn = Math.min(progress * 7, 1);
-          const fadeOut = Math.min((1 - progress) * 3.5, 1);
+          const fadeOut = burst.phase === "finale" ? 1 : Math.min((1 - progress) * 3.5, 1);
           const opacity = Math.max(0, Math.min(fadeIn, fadeOut));
           const maxWidth = Math.max(120, Math.min(window.innerWidth - 40, 660));
           const rise = Math.sin(Math.min(progress * 1.5, 1) * Math.PI / 2) * 12;
@@ -503,11 +523,16 @@
           if (burst.photo && portrait.complete && portrait.naturalWidth > 0) {
             const maxSize = Math.max(1, Math.min(520, window.innerWidth - 40, window.innerHeight - 40));
             const easedProgress = progress * progress * (3 - 2 * progress);
-            const imageSize = maxSize * (0.16 + 0.84 * easedProgress);
-            const burstRadius = maxSize * 0.7 * easedProgress;
+            const imageScale = burst.phase === "reveal"
+              ? 0.16 + 0.84 * easedProgress
+              : burst.phase === "zoom-out"
+                ? 1 - 0.84 * easedProgress
+                : 0.16;
+            const imageSize = maxSize * imageScale;
+            const burstRadius = maxSize * 0.7 * imageScale;
             const x = Math.max(maxSize / 2 + 16, Math.min(window.innerWidth - maxSize / 2 - 16, burst.x));
             const y = Math.max(maxSize / 2 + 16, Math.min(window.innerHeight - maxSize / 2 - 16, burst.y));
-            finalPortraitPosition = { x, y, size: maxSize };
+            finalPortraitPosition = { x, y, size: maxSize * 0.16 };
             context.save();
             context.globalAlpha = opacity;
             context.shadowColor = `hsla(${burst.hue}, 100%, 70%, ${opacity})`;
