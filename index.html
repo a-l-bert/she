@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#090a12">
-  <title>Fireworks · Every Word Is True</title>
+  <title>Fireworks · I Didn't Stop</title>
   <style>
     :root {
       color-scheme: dark;
@@ -45,23 +45,6 @@
       overflow-x: hidden;
     }
 
-    .sound-control {
-      position: fixed;
-      z-index: 3;
-      right: 18px;
-      bottom: 18px;
-      border: 1px solid rgba(255, 255, 255, 0.32);
-      border-radius: 999px;
-      padding: 11px 16px;
-      color: #fff;
-      background: rgba(12, 12, 20, 0.66);
-      font: 600 14px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      cursor: pointer;
-      backdrop-filter: blur(8px);
-    }
-
-    .sound-control:focus-visible { outline: 3px solid #ffd36e; outline-offset: 4px; }
-
     .sr-only {
       position: absolute;
       width: 1px;
@@ -85,11 +68,9 @@
 <body>
   <div class="night-sky" aria-hidden="true"></div>
   <canvas id="fireworks" aria-hidden="true"></canvas>
-  <button id="sound-control" class="sound-control" type="button" aria-pressed="false">Enable fireworks sound</button>
   <div id="spoken-message" class="sr-only" aria-live="polite"></div>
 
   <script>
-    const soundControl = document.querySelector("#sound-control");
     const spokenMessage = document.querySelector("#spoken-message");
     const canvas = document.querySelector("#fireworks");
     const context = canvas.getContext("2d");
@@ -101,30 +82,24 @@
     let nextLaunchDelay = 700;
     let previousFrameTime = 0;
     let audioContext;
-    let soundEnabled = false;
     let messageIndex = 0;
     let activeBurstMessage = null;
-    let showPhoto = false;
-    let finaleActive = false;
+    let finaleStartedAt = null;
     let animationStopped = false;
-    let finalPortraitPosition = null;
-    const portrait = new Image();
-    portrait.src = "assets/albertworld-cutout.png";
-    portrait.addEventListener("error", () => {
-      spokenMessage.textContent = "The photo could not be loaded.";
-      console.error(`Could not load the Albertworld photo: ${portrait.src}`);
-    });
     const messages = [
-      "ONE THING I KNOW FOR SURE · 2026",
-      "I've Got Your Back",
-      "I don't say this lightly, and I don't need a big speech.",
-      "I miss you. I love you. And I remember our day.",
-      "What matters: You and me",
-      "My word: I'll show up, every time",
-      "My plan: Make the distance worth it",
-      "I meant every word.",
-      "This is Albertworld.",
-      "Welcome to my world."
+      "The body begs for rest, but the mind hasn't stopped",
+      "And every step I take guides me to where I am going",
+      "Even though I am tired, I didn't stop",
+      "Even though I was falling, I stood back up",
+      "I have already reached my absolute limit",
+      "Even though I was bleeding, I kept going",
+      "I have already made it this far, that's why I won't give up",
+      "Even without strength, I fought",
+      "I gave my absolute maximum, and finally, I arrived",
+      "When you lose faith, do not let the pain defeat you",
+      "Go forward without stopping",
+      "Even though I am tired, I didn't stop",
+      "Even though I was falling, I stood back up"
     ];
 
     function resizeCanvas() {
@@ -146,7 +121,9 @@
         if (AudioContext) audioContext = new AudioContext();
       }
       if (audioContext && audioContext.state === "suspended") {
-        audioContext.resume();
+        audioContext.resume().catch((error) => {
+          console.error("Could not start fireworks audio:", error);
+        });
       }
     }
 
@@ -165,7 +142,7 @@
     }
 
     function playFireworkSound() {
-      if (reduceMotion || !soundEnabled || !audioContext) return;
+      if (!audioContext) return;
       const now = audioContext.currentTime;
       const duration = 1.15;
 
@@ -221,46 +198,11 @@
       snap.stop(now + 0.16);
     }
 
-    function playRocketSound(flightTime) {
-      if (!soundEnabled || !audioContext) return;
-      const now = audioContext.currentTime;
-      const whistle = audioContext.createOscillator();
-      const volume = audioContext.createGain();
-      const hiss = audioContext.createBufferSource();
-      const hissFilter = audioContext.createBiquadFilter();
-      const hissGain = audioContext.createGain();
-      const duration = Math.max(0.65, Math.min(flightTime, 2.2));
-      whistle.type = "triangle";
-      whistle.frequency.setValueAtTime(280 + Math.random() * 100, now);
-      whistle.frequency.exponentialRampToValueAtTime(900 + Math.random() * 450, now + duration);
-      volume.gain.setValueAtTime(0.0001, now);
-      volume.gain.exponentialRampToValueAtTime(0.022, now + 0.12);
-      volume.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-      whistle.connect(volume);
-      volume.connect(audioContext.destination);
-      whistle.start(now);
-      whistle.stop(now + duration);
-
-      hiss.buffer = createNoiseBuffer(duration);
-      hissFilter.type = "bandpass";
-      hissFilter.frequency.setValueAtTime(520, now);
-      hissFilter.frequency.exponentialRampToValueAtTime(1700, now + duration);
-      hissFilter.Q.value = 0.55;
-      hissGain.gain.setValueAtTime(0.0001, now);
-      hissGain.gain.exponentialRampToValueAtTime(0.012, now + 0.16);
-      hissGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-      hiss.connect(hissFilter);
-      hissFilter.connect(hissGain);
-      hissGain.connect(audioContext.destination);
-      hiss.start(now);
-      hiss.stop(now + duration);
-    }
-
-    function launchRocket() {
+    function launchRocket(speedMultiplier = 1) {
       const x = Math.random() * window.innerWidth;
       const y = window.innerHeight + 8;
       const targetY = window.innerHeight * (0.18 + Math.random() * 0.42);
-      const speed = 430 + Math.random() * 250;
+      const speed = (430 + Math.random() * 250) * speedMultiplier;
       rockets.push({
         x,
         y,
@@ -272,7 +214,6 @@
         life: (y - targetY) / speed + 1,
         trail: []
       });
-      playRocketSound((y - targetY) / speed);
     }
 
     function explodeRocket(rocket) {
@@ -280,34 +221,18 @@
       const style = Math.random();
       const radiusSpeed = style < 0.2 ? 300 : 180 + Math.random() * 180;
       const burstHue = rocket.hue;
-      if (!activeBurstMessage) {
-        if (messageIndex < messages.length) {
-          const message = messages[messageIndex];
-          messageIndex += 1;
-          spokenMessage.textContent = message;
-          activeBurstMessage = {
-            text: message,
-            x: rocket.x,
-            y: rocket.y,
-            hue: burstHue,
-            age: 0,
-            life: 2.8,
-            photo: false
-          };
-        } else if (!showPhoto) {
-          showPhoto = true;
-          spokenMessage.textContent = "A photo of Albert appears in the fireworks.";
-          activeBurstMessage = {
-            text: "",
-            x: rocket.x,
-            y: rocket.y,
-            hue: burstHue,
-            age: 0,
-            life: 1.4,
-            phase: "reveal",
-            photo: true
-          };
-        }
+      if (!activeBurstMessage && messageIndex < messages.length) {
+        const message = messages[messageIndex];
+        messageIndex += 1;
+        spokenMessage.textContent = message;
+        activeBurstMessage = {
+          text: message,
+          x: rocket.x,
+          y: rocket.y,
+          hue: burstHue,
+          age: 0,
+          life: 2.8
+        };
       }
 
       const flash = context.createRadialGradient(rocket.x, rocket.y, 0, rocket.x, rocket.y, 150);
@@ -343,6 +268,7 @@
 
       if (style > 0.65) {
         window.setTimeout(() => {
+          if (animationStopped) return;
           for (let index = 0; index < 3; index += 1) {
             const angle = Math.random() * Math.PI * 2;
             const speed = 75 + Math.random() * 110;
@@ -386,6 +312,14 @@
     }
 
     function animateFireworks(timestamp) {
+      if (finaleStartedAt !== null && timestamp - finaleStartedAt >= 5000) {
+        animationStopped = true;
+        rockets = [];
+        particles = [];
+        context.clearRect(0, 0, window.innerWidth, window.innerHeight);
+        return;
+      }
+
       const delta = previousFrameTime ? Math.min((timestamp - previousFrameTime) / 1000, 0.035) : 0.016;
       previousFrameTime = timestamp;
       context.fillStyle = "rgba(8, 9, 16, 0.2)";
@@ -399,16 +333,20 @@
         context.fill();
       }
 
-      if ((!showPhoto || finaleActive) && timestamp - lastLaunchTime > nextLaunchDelay) {
-        launchRocket();
+      const finaleActive = finaleStartedAt !== null;
+      if (timestamp - lastLaunchTime > nextLaunchDelay) {
+        launchRocket(finaleActive ? 2.2 : 1);
+        if (finaleActive && Math.random() > 0.35) {
+          launchRocket(2.2);
+        }
         lastLaunchTime = timestamp;
         nextLaunchDelay = finaleActive
-          ? 85 + Math.random() * 100
+          ? 110 + Math.random() * 70
           : 420 + Math.random() * 700;
-        if ((!showPhoto || finaleActive) && Math.random() > (finaleActive ? 0.38 : 0.58)) {
+        if (!finaleActive && Math.random() > 0.58) {
           window.setTimeout(() => {
-            if (!document.hidden && (!showPhoto || finaleActive)) launchRocket();
-          }, finaleActive ? 35 + Math.random() * 90 : 160 + Math.random() * 300);
+            if (!document.hidden && !animationStopped && finaleStartedAt === null) launchRocket();
+          }, 160 + Math.random() * 300);
         }
       }
 
@@ -451,8 +389,6 @@
         context.stroke();
         return rocket.age < rocket.life;
       });
-      if (showPhoto) rockets = [];
-
       particles = particles.filter((particle) => {
         particle.age += delta;
         particle.lastX = particle.x;
@@ -488,132 +424,62 @@
         burst.age += delta;
         const progress = burst.age / burst.life;
         if (progress >= 1) {
-          if (burst.photo) {
-            if (burst.phase === "reveal") {
-              burst.phase = "zoom-out";
-              burst.age = 0;
-              burst.life = 3;
-            } else if (burst.phase === "zoom-out") {
-              burst.phase = "finale";
-              burst.age = 0;
-              burst.life = 2;
-              finaleActive = true;
-              rockets = [];
-              particles = [];
-              lastLaunchTime = timestamp;
-              nextLaunchDelay = 0;
-            } else {
-              rockets = [];
-              particles = [];
-              context.clearRect(0, 0, window.innerWidth, window.innerHeight);
-              drawFinalPortrait();
-              animationStopped = true;
-              return;
-            }
-          } else {
-            activeBurstMessage = null;
+          activeBurstMessage = null;
+          if (messageIndex === messages.length) {
+            finaleStartedAt = timestamp;
           }
         } else {
           const fadeIn = Math.min(progress * 7, 1);
-          const fadeOut = burst.phase === "finale" ? 1 : Math.min((1 - progress) * 3.5, 1);
+          const fadeOut = Math.min((1 - progress) * 3.5, 1);
           const opacity = Math.max(0, Math.min(fadeIn, fadeOut));
           const maxWidth = Math.max(120, Math.min(window.innerWidth - 40, 660));
           const rise = Math.sin(Math.min(progress * 1.5, 1) * Math.PI / 2) * 12;
 
-          if (burst.photo && portrait.complete && portrait.naturalWidth > 0) {
-            const maxSize = Math.max(1, Math.min(520, window.innerWidth - 40, window.innerHeight - 40));
-            const easedProgress = progress * progress * (3 - 2 * progress);
-            const imageScale = burst.phase === "reveal"
-              ? 0.16 + 0.84 * easedProgress
-              : burst.phase === "zoom-out"
-                ? 1 - 0.84 * easedProgress
-                : 0.16;
-            const imageSize = maxSize * imageScale;
-            const burstRadius = maxSize * 0.7 * imageScale;
-            const x = Math.max(maxSize / 2 + 16, Math.min(window.innerWidth - maxSize / 2 - 16, burst.x));
-            const y = Math.max(maxSize / 2 + 16, Math.min(window.innerHeight - maxSize / 2 - 16, burst.y));
-            finalPortraitPosition = { x, y, size: maxSize * 0.16 };
-            context.save();
-            context.globalAlpha = opacity;
-            context.shadowColor = `hsla(${burst.hue}, 100%, 70%, ${opacity})`;
-            context.shadowBlur = 26;
-            context.beginPath();
-            const points = 28;
-            for (let index = 0; index < points; index += 1) {
-              const angle = (index / points) * Math.PI * 2 - Math.PI / 2;
-              const radius = burstRadius * (index % 2 === 0 ? 1 : 0.76);
-              const pointX = x + Math.cos(angle) * radius;
-              const pointY = y + Math.sin(angle) * radius;
-              if (index === 0) context.moveTo(pointX, pointY);
-              else context.lineTo(pointX, pointY);
-            }
-            context.closePath();
-            context.clip();
-            context.drawImage(portrait, x - imageSize / 2, y - imageSize / 2, imageSize, imageSize);
-            context.restore();
-          } else if (!burst.photo) {
-            const fontSize = Math.min(25, Math.max(16, window.innerWidth * 0.042));
-            const lineHeight = fontSize * 1.35;
-            context.font = `800 ${fontSize}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-            context.textAlign = "center";
-            context.textBaseline = "middle";
-            const lines = wrapMessage(burst.text, maxWidth);
-            const textHeight = lines.length * lineHeight;
-            const safeTop = 24 + textHeight / 2;
-            const safeBottom = window.innerHeight - 24 - textHeight / 2;
-            const widestLine = Math.max(...lines.map((line) => context.measureText(line).width));
-            const safeLeft = Math.min(window.innerWidth - 16, 16 + widestLine / 2);
-            const safeRight = Math.max(16, window.innerWidth - 16 - widestLine / 2);
-            const textX = Math.max(safeLeft, Math.min(safeRight, burst.x));
-            const textCenterY = Math.max(safeTop, Math.min(safeBottom, burst.y - rise));
+          const fontSize = Math.min(25, Math.max(16, window.innerWidth * 0.042));
+          const lineHeight = fontSize * 1.35;
+          context.font = `800 ${fontSize}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
+          context.textAlign = "center";
+          context.textBaseline = "middle";
+          const lines = wrapMessage(burst.text, maxWidth);
+          const textHeight = lines.length * lineHeight;
+          const safeTop = 24 + textHeight / 2;
+          const safeBottom = window.innerHeight - 24 - textHeight / 2;
+          const widestLine = Math.max(...lines.map((line) => context.measureText(line).width));
+          const safeLeft = Math.min(window.innerWidth - 16, 16 + widestLine / 2);
+          const safeRight = Math.max(16, window.innerWidth - 16 - widestLine / 2);
+          const textX = Math.max(safeLeft, Math.min(safeRight, burst.x));
+          const textCenterY = Math.max(safeTop, Math.min(safeBottom, burst.y - rise));
 
-            lines.forEach((line, index) => {
-              const y = textCenterY + (index - (lines.length - 1) / 2) * lineHeight;
-              context.lineJoin = "round";
-              context.lineWidth = Math.max(4, fontSize * 0.3);
-              context.strokeStyle = `rgba(7, 8, 15, ${opacity * 0.86})`;
-              context.strokeText(line, textX, y, maxWidth);
-              context.fillStyle = `hsla(${burst.hue}, 100%, 88%, ${opacity})`;
-              context.shadowBlur = 20;
-              context.shadowColor = `hsla(${burst.hue}, 100%, 70%, ${opacity})`;
-              context.fillText(line, textX, y, maxWidth);
-              context.shadowBlur = 0;
-            });
-          }
+          lines.forEach((line, index) => {
+            const y = textCenterY + (index - (lines.length - 1) / 2) * lineHeight;
+            context.lineJoin = "round";
+            context.lineWidth = Math.max(4, fontSize * 0.3);
+            context.strokeStyle = `rgba(7, 8, 15, ${opacity * 0.86})`;
+            context.strokeText(line, textX, y, maxWidth);
+            context.fillStyle = `hsla(${burst.hue}, 100%, 88%, ${opacity})`;
+            context.shadowBlur = 20;
+            context.shadowColor = `hsla(${burst.hue}, 100%, 70%, ${opacity})`;
+            context.fillText(line, textX, y, maxWidth);
+            context.shadowBlur = 0;
+          });
         }
       }
 
-      if (!animationStopped) window.requestAnimationFrame(animateFireworks);
-    }
-
-    function drawFinalPortrait() {
-      if (!portrait.complete || portrait.naturalWidth === 0) return;
-      const size = finalPortraitPosition?.size ?? Math.max(1, Math.min(520, window.innerWidth - 40, window.innerHeight - 40));
-      const x = finalPortraitPosition?.x ?? window.innerWidth / 2;
-      const y = finalPortraitPosition?.y ?? window.innerHeight / 2;
-      context.save();
-      context.shadowColor = "rgba(255, 220, 130, 0.8)";
-      context.shadowBlur = 32;
-      context.drawImage(portrait, x - size / 2, y - size / 2, size, size);
-      context.restore();
+      window.requestAnimationFrame(animateFireworks);
     }
 
     resizeCanvas();
-    window.addEventListener("resize", () => {
-      resizeCanvas();
-      if (animationStopped) drawFinalPortrait();
-    });
+    window.addEventListener("resize", resizeCanvas);
 
-    soundControl.addEventListener("click", () => {
-      ensureAudio();
-      soundEnabled = !soundEnabled;
-      soundControl.textContent = soundEnabled ? "Fireworks sound: on" : "Fireworks sound: off";
-      soundControl.setAttribute("aria-pressed", String(soundEnabled));
-    });
+    document.addEventListener("pointerdown", ensureAudio);
+    document.addEventListener("keydown", ensureAudio);
+    ensureAudio();
 
     document.addEventListener("visibilitychange", () => {
       if (document.hidden && audioContext) {
         audioContext.suspend();
+      } else {
+        ensureAudio();
       }
     });
 
